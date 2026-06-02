@@ -38,19 +38,23 @@ jobs:
           repository: getcomputeros/kernel
           path: _kernel
 
-      - name: Narzędzia buildera
-        run: emerge -q1 dev-vcs/git sys-devel/bc dev-util/pahole app-arch/zstd
-
-      - name: Layout (symlinki których oczekują skrypty) + zamrożone drzewo gentoo
+      # Drzewo MUSI być zanim emerge'niemy cokolwiek. Bierzemy tarball wg SHA (bez git —
+      # chicken-egg: git emerge'uje się z drzewa którego nie ma). Pinowane przez SHA w URL.
+      - name: Layout + zamrożone drzewo gentoo (tarball wg SHA)
         run: |
           set -e
           ln -sfn "$GITHUB_WORKSPACE" /build
           ln -sfn "$GITHUB_WORKSPACE/_overlays/overlay-computeros" /var/db/repos/computeros
-          mkdir -p /out /rootfs
+          mkdir -p /out /rootfs /var/db/repos
           SHA=$(awk -F'"' '/gentoo_repo_sha/{print $2}' release.toml)
-          echo ">> frozen gentoo tree: $SHA"
-          git clone --filter=blob:none https://github.com/gentoo-mirror/gentoo /var/db/repos/gentoo
-          git -C /var/db/repos/gentoo checkout -q "$SHA"
+          echo ">> frozen gentoo tree: $SHA (tarball)"
+          DL="wget -qO-"; command -v wget >/dev/null || DL="curl -fsSL"
+          $DL "https://github.com/gentoo-mirror/gentoo/archive/${SHA}.tar.gz" | tar xz -C /tmp
+          rm -rf /var/db/repos/gentoo
+          mv "/tmp/gentoo-${SHA}" /var/db/repos/gentoo
+
+      - name: Narzędzia buildera (drzewo już jest)
+        run: emerge -q1 net-misc/curl sys-devel/bc dev-util/pahole app-arch/zstd
 
       - name: Build kernel
         run: OUT=/out _kernel/build-kernel.sh "$BOARD"
