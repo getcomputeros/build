@@ -1,0 +1,84 @@
+name: build-image
+
+# Trigger: push taga v* (np. v0.1.0) albo ręcznie z zakładki Actions.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      board:
+        description: 'Board (qemu | fat | <board>)'
+        default: 'qemu'
+        type: string
+
+jobs:
+  build:
+    # Self-hosted ARC scale set na klastrze jose (infrad: platform/arc-getcomputeros).
+    runs-on: getcomputeros
+    # Cały build leci w kontenerze gentoo/stage3 — bez privileged (assembly unprivileged).
+    container:
+      image: docker.io/gentoo/stage3:amd64-systemd
+    env:
+      BOARD: ${{ github.event.inputs.board || 'qemu' }}
+      VERSION: '0.1'
+    steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v4
+
+      - name: Checkout overlays
+        uses: actions/checkout@v4
+        with:
+          repository: getcomputeros/overlays
+          path: _overlays
+
+      - name: Checkout kernel
+        uses: actions/checkout@v4
+        with:
+          repository: getcomputeros/kernel
+          path: _kernel
+
+      - name: Narzędzia buildera
+        run: emerge -q1 dev-vcs/git sys-devel/bc dev-util/pahole app-arch/zstd
+
+      - name: Layout (symlinki których oczekują skrypty) + zamrożone drzewo gentoo
+        run: |
+          set -e
+          ln -sfn "$GITHUB_WORKSPACE" /build
+          ln -sfn "$GITHUB_WORKSPACE/_overlays/overlay-computeros" /var/db/repos/computeros
+          mkdir -p /out /rootfs
+          SHA=$(awk -F'"' '/gentoo_repo_sha/{print $2}' release.toml)
+          echo ">> frozen gentoo tree: $SHA"
+          git clone --filter=blob:none https://github.com/gentoo-mirror/gentoo /var/db/repos/gentoo
+          git -C /var/db/repos/gentoo checkout -q "$SHA"
+
+      - name: Build kernel
+        run: OUT=/out _kernel/build-kernel.sh "$BOARD"
+
+      - name: Build image (emerge -> squashfs -> GPT assembly)
+        run: BOARD="$BOARD" bash /build/build-image.sh
+
+      - name: Kompresja obrazu (raw -> zst; raw = dd na USB albo qemu-img convert)
+        run: |
+          mv /out/disk.raw "/out/computeros-${VERSION}-${BOARD}.raw"
+          zstd -19 -T0 --rm "/out/computeros-${VERSION}-${BOARD}.raw"
+          ls -lh /out/
+
+      - name: Upload artefaktu (każdy build)
+        uses: actions/upload-artifact@v4
+        with:
+          name: computeros-${{ env.VERSION }}-${{ env.BOARD }}
+          path: |
+            /out/computeros-*.raw.zst
+            /out/vmlinuz-*
+            /out/lock-*.txt
+          retention-days: 14
+
+      - name: GitHub Release (tylko na tag v*)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            /out/computeros-*.raw.zst
+            /out/lock-*.txt
+          generate_release_notes: true
