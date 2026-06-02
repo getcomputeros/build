@@ -17,6 +17,15 @@ emerge -q1 sys-apps/gptfdisk sys-fs/mtools sys-fs/dosfstools sys-fs/e2fsprogs ap
 # squashfs-tools MUSI mieć zstd (stage3 buduje je bez) — inaczej `mksquashfs -comp zstd` pada
 USE="zstd lz4 lzo xz" emerge -q1 sys-fs/squashfs-tools
 
+echo ">> Merged-usr symlinki w /rootfs (emerge do bare-roota ich NIE tworzy; systemd/sbin-init wymaga)"
+# Normalnie daje je stage3. Budując rootfs od zera musimy je założyć PRZED emerge, żeby pakiety
+# instalowały się w scalonym layoucie i /sbin/init się rozwiązywał.
+mkdir -p /rootfs/usr/bin /rootfs/usr/sbin /rootfs/usr/lib /rootfs/usr/lib64
+ln -sf usr/bin   /rootfs/bin
+ln -sf usr/sbin  /rootfs/sbin
+ln -sf usr/lib   /rootfs/lib
+ln -sf usr/lib64 /rootfs/lib64
+
 echo ">> Instalacja userlandu do /rootfs — kuratorowany set RUNTIME (--root-deps=rdeps)"
 # NIE @system (ciągnie gcc/binutils/make/portage do obrazu). Tylko to czego JeOS potrzebuje
 # do działania; --root-deps=rdeps → tylko RDEPEND ląduje w /rootfs, toolchain zostaje w kontenerze.

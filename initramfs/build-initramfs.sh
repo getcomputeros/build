@@ -31,7 +31,8 @@ copy_with_libs() {
   done
 }
 
-for b in bash mount losetup switch_root findfs; do
+# bash NIE ma wbudowanych mkdir/cat (to osobne binarki coreutils) — dokładamy je.
+for b in bash mount losetup switch_root findfs mkdir cat; do
   copy_with_libs "$(find_bin "$b")"
 done
 

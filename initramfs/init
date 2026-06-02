@@ -8,9 +8,9 @@ mount -t proc     proc /proc
 mount -t sysfs    sys  /sys
 mount -t devtmpfs dev  /dev
 
-# cos.image=/images/rootfs-X.squashfs z cmdline (czysty bash, bez sed)
+# cos.image=/images/rootfs-X.squashfs z cmdline (czysty bash, bez cat/sed)
 IMG=""
-for tok in $(cat /proc/cmdline); do
+for tok in $(</proc/cmdline); do
   case "$tok" in cos.image=*) IMG="${tok#cos.image=}";; esac
 done
 [ -n "$IMG" ] || rescue "brak cos.image= w cmdline"
@@ -34,4 +34,8 @@ mkdir -p /mnt/root/mnt/system /mnt/root/mnt/data
 mount --move /mnt/system /mnt/root/mnt/system 2>/dev/null || true
 mount --move /mnt/data   /mnt/root/mnt/data   2>/dev/null || true
 
-exec switch_root /mnt/root /sbin/init || rescue "switch_root"
+# fallback ścieżek init (merged-usr / różne layouty)
+for I in /sbin/init /usr/lib/systemd/systemd /lib/systemd/systemd /usr/sbin/init; do
+  [ -x "/mnt/root$I" ] && exec switch_root /mnt/root "$I"
+done
+rescue "nie znaleziono init w nowym roocie"
