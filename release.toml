@@ -1,0 +1,14 @@
+[computeros]
+version = "0.1.0"
+
+[sources]
+gentoo_repo_sha = "b572ab2ebcd67457aabdb2e0246761838ba886ee"  # zamrożone drzewo gentoo — tuż przed przełączeniem PYTHON_SINGLE_TARGET na 3.14, pasuje do stage3:amd64-systemd (python3_13)
+overlay_tag     = "computeros-0.1"        # tag w getcomputeros/overlays (utworzymy po zielonym boocie)
+stage3_digest   = "sha256:TODO"           # `podman image inspect docker.io/gentoo/stage3:amd64-systemd --format '{{.Digest}}'`
+
+[kernel]
+version = "7.0.11"                         # = kernel/KERNEL_VERSION
+config   = "kernel/config/v0.1.fragment"   # fragment kconfig
+
+[lock]
+manifest = "lock-0.1.0.txt"                # dokładne wersje wszystkich paczek (zrzut z buildu)

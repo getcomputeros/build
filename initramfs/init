@@ -1,0 +1,37 @@
+#!/bin/bash
+# JeOS initramfs (0.1): bash + util-linux. Montuje squashfs (loop) → overlay → switch_root.
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+rescue() { echo "INITRAMFS RESCUE: $1"; exec /bin/bash; }
+
+mkdir -p /proc /sys /dev /mnt/system /mnt/data /mnt/squash /mnt/root
+mount -t proc     proc /proc
+mount -t sysfs    sys  /sys
+mount -t devtmpfs dev  /dev
+
+# cos.image=/images/rootfs-X.squashfs z cmdline (czysty bash, bez sed)
+IMG=""
+for tok in $(cat /proc/cmdline); do
+  case "$tok" in cos.image=*) IMG="${tok#cos.image=}";; esac
+done
+[ -n "$IMG" ] || rescue "brak cos.image= w cmdline"
+
+SYSDEV=/dev/vda2; DATADEV=/dev/vda3
+# fallback po etykietach (fat/realny sprzęt: dysk to nie /dev/vda)
+[ -b "$SYSDEV" ]  || SYSDEV=$(findfs LABEL=cos-system) || rescue "brak partycji system"
+[ -b "$DATADEV" ] || DATADEV=$(findfs LABEL=cos-data)  || rescue "brak partycji data"
+
+mount -o ro "$SYSDEV" /mnt/system             || rescue "mount system"
+LOOP=$(losetup -f --show "/mnt/system${IMG}")  || rescue "losetup squashfs ($IMG)"
+mount -t squashfs -o ro "$LOOP" /mnt/squash    || rescue "mount squashfs"
+mount "$DATADEV" /mnt/data                      || rescue "mount data"
+
+mkdir -p /mnt/data/overlay/upper /mnt/data/overlay/work
+mount -t overlay overlay \
+  -o lowerdir=/mnt/squash,upperdir=/mnt/data/overlay/upper,workdir=/mnt/data/overlay/work \
+  /mnt/root || rescue "overlayfs"
+
+mkdir -p /mnt/root/mnt/system /mnt/root/mnt/data
+mount --move /mnt/system /mnt/root/mnt/system 2>/dev/null || true
+mount --move /mnt/data   /mnt/root/mnt/data   2>/dev/null || true
+
+exec switch_root /mnt/root /sbin/init || rescue "switch_root"
