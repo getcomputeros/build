@@ -13,13 +13,17 @@ printf "[computeros]\nlocation = /var/db/repos/computeros\nauto-sync = no\n" \
 ln -sfn /var/db/repos/computeros/profiles/computeros /etc/portage/make.profile
 
 echo ">> Narzędzia hosta-buildera (NIE trafiają do obrazu)"
-emerge -q1 sys-fs/squashfs-tools sys-apps/gptfdisk sys-fs/mtools sys-fs/dosfstools sys-fs/e2fsprogs app-arch/cpio
+emerge -q1 sys-apps/gptfdisk sys-fs/mtools sys-fs/dosfstools sys-fs/e2fsprogs app-arch/cpio
+# squashfs-tools MUSI mieć zstd (stage3 buduje je bez) — inaczej `mksquashfs -comp zstd` pada
+USE="zstd lz4 lzo xz" emerge -q1 sys-fs/squashfs-tools
 
 echo ">> Instalacja userlandu do /rootfs — kuratorowany set RUNTIME (--root-deps=rdeps)"
 # NIE @system (ciągnie gcc/binutils/make/portage do obrazu). Tylko to czego JeOS potrzebuje
 # do działania; --root-deps=rdeps → tylko RDEPEND ląduje w /rootfs, toolchain zostaje w kontenerze.
 # computeros/core-runtime = nasz ebuild wyjmujący runtime .so z gcc (śledzony, w lock-manifeście).
-emerge --root=/rootfs --root-deps=rdeps -q \
+# --buildpkg --usepkg = binpkg cache (PKGDIR=/var/cache/binpkgs, montowany przez run-local.sh).
+# Pierwszy run kompiluje + cache'uje; kolejne iteracje instalują z .gpkg (sekundy, nie 30 min).
+emerge --root=/rootfs --root-deps=rdeps --buildpkg --usepkg -q \
   sys-apps/systemd sys-apps/util-linux sys-apps/shadow app-shells/bash \
   sys-apps/baselayout sys-apps/coreutils sys-apps/kmod \
   computeros/core-runtime

@@ -44,8 +44,10 @@ jobs:
         run: |
           set -e
           ln -sfn "$GITHUB_WORKSPACE" /build
-          ln -sfn "$GITHUB_WORKSPACE/_overlays/overlay-computeros" /var/db/repos/computeros
           mkdir -p /out /rootfs /var/db/repos
+          # KOPIA (nie symlink!) — profil ma parent ze ścieżką względną ../../../gentoo,
+          # więc overlay MUSI być realnym rodzeństwem /var/db/repos/gentoo (symlink łamie resolve)
+          cp -a "$GITHUB_WORKSPACE/_overlays/overlay-computeros" /var/db/repos/computeros
           SHA=$(awk -F'"' '/gentoo_repo_sha/{print $2}' release.toml)
           echo ">> frozen gentoo tree: $SHA (tarball)"
           DL="wget -qO-"; command -v wget >/dev/null || DL="curl -fsSL"

@@ -1,0 +1,5 @@
+out/
+*.qcow2
+*.raw
+*.raw.zst
+*.squashfs

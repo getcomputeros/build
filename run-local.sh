@@ -10,6 +10,8 @@ STAGE3="docker.io/gentoo/stage3:amd64-systemd"   # TODO: zamień na ...@sha256:<
 GENTOO_SHA="$(awk -F'"' '/gentoo_repo_sha/{print $2}' "$ROOT/release.toml")"
 OVERLAY="${OVERLAY:-$HOME/Developer/overlays/overlay-computeros}"
 OUT="${OUT:-$ROOT/out}"; mkdir -p "$OUT"
+# Binpkg cache na hoście — przeżywa między buildami, kolejne iteracje instalują z .gpkg (szybko)
+PKGCACHE="${PKGCACHE:-$HOME/.cache/computeros/binpkgs}"; mkdir -p "$PKGCACHE"
 
 # Zamrożone drzewo gentoo: cache na hoście, twardy checkout na SHA z release.toml. BEZ emerge --sync.
 TREE="${TREE:-$HOME/.cache/computeros/gentoo-tree}"
@@ -24,6 +26,7 @@ echo ">> drzewo gentoo zamrożone na $GENTOO_SHA (engine: $ENGINE)"
   -v "$OVERLAY":/var/db/repos/computeros:ro,z \
   -v "$ROOT":/build:ro,z \
   -v "$OUT":/out:z \
+  -v "$PKGCACHE":/var/cache/binpkgs:z \
   --tmpfs /rootfs:rw,size=4g \
   "$STAGE3" bash /build/build-image.sh
 
