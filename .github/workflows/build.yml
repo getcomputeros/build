@@ -12,6 +12,10 @@ on:
         default: 'qemu'
         type: string
 
+# action-gh-release potrzebuje contents: write do utworzenia Release (domyślny token jest ro)
+permissions:
+  contents: write
+
 jobs:
   build:
     # Self-hosted ARC scale set na klastrze jose (infrad: platform/arc-getcomputeros).
